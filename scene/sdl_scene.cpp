@@ -19,6 +19,12 @@
 
 namespace scene {
 
+void SdlScene::update()
+{
+    SDL_RenderPresent(renderer_);
+    SDL_RenderClear(renderer_);
+}
+
 void SdlScene::draw(space::Background const& background)
 {
     constexpr auto kCitizenSize = 25;

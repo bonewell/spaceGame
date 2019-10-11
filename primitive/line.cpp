@@ -1,5 +1,7 @@
 #include "line.hpp"
 
+#include <cmath>
+
 namespace primitive {
 
 double Line::length() const

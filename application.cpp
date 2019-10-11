@@ -6,6 +6,7 @@
 #include <SDL2/SDL.h>
 
 #include "game.hpp"
+#include "scene/sdl_scene.hpp"
 
 Application::Application(primitive::Size size)
     : size_{std::move(size)}
@@ -32,8 +33,9 @@ void Application::run()
     }
 
     {
+        scene::SdlScene scene{renderer, size_};
         // TODO: Extract this dependence
-        Game{renderer, size_, 5}.run();
+        Game{scene, size_, 5}.run();
     }
 
     SDL_DestroyRenderer(renderer);

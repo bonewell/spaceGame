@@ -7,8 +7,6 @@
 #include <mutex>
 #include <vector>
 
-#include <SDL2/SDL.h>
-
 #include "primitive/size.hpp"
 #include "primitive/time.hpp"
 #include "scene/sdl_scene.hpp"
@@ -43,8 +41,13 @@ public:
 };
 
 class Game{
+public:
+    Game(scene::Scene& scene, primitive::Size, int);
+    void run();
+
 private:
-    SDL_Renderer *renderer_{nullptr};
+    scene::Scene& scene_;
+
     primitive::Size screen_size_;
     space::LifeAmount life_amount_;
     std::atomic_bool running_{false};
@@ -56,16 +59,11 @@ private:
     std::mutex asteroids_mutex_;
     std::mutex projectiles_mutex_;
 
-    // For event handling
-    SDL_Event e_;
-
     space::Background background_;
     space::Ship ship_;
     std::list<space::ProjectilePtr> projectiles_;
     std::list<space::AsteroidPtr> asteroids_;
     std::list<space::ExplosionPtr> explosions_;
-
-    scene::SdlScene scene_;
 
     // Continuous buttom pushing flags
     bool space_pushed_{false};
@@ -98,9 +96,6 @@ private:
     void update();
 
     void generateExplosion(space::Asteroid*);
-public:
-    Game(SDL_Renderer*, primitive::Size, int);
-    void run();
 };
 
 #endif

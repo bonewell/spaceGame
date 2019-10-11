@@ -6,6 +6,8 @@
 
 #include <unistd.h>
 
+#include <SDL2/SDL.h>
+
 #include "figure/factory_shape.hpp"
 #include "space/grid.hpp"
 
@@ -13,12 +15,11 @@ constexpr auto kAsteroidsRemovingDelay = 10ms;
 constexpr auto kChangePositionDelay = 30ms;
 constexpr auto kInertiaDelay = 10ms;
 
-Game::Game(SDL_Renderer* renderer, primitive::Size size, int life_amount)
-    : renderer_{renderer},
+Game::Game(scene::Scene& scene, primitive::Size size, int life_amount)
+    : scene_{scene},
       screen_size_{size},
       life_amount_{life_amount},
-      ship_{{double(screen_size_.width)/2, double(screen_size_.height)/2}},
-      scene_{renderer_, screen_size_}
+      ship_{{double(screen_size_.width)/2, double(screen_size_.height)/2}}
 {
 //  Uncomment to show grid
 //  background_.grid = std::make_unique<space::Grid>();
@@ -287,8 +288,7 @@ void Game::displayObjects()
 
     life_amount_.display(scene_);
 
-    SDL_RenderPresent(renderer_);
-    SDL_RenderClear(renderer_);
+    scene_.update();
 }
 
 void Game::changeObjectsPositions(){
@@ -325,6 +325,7 @@ void Game::run()
     std::thread hits_monitoring(&Game::checkHits, this);
     std::thread ship_hits_monitoring(&Game::checkShipHits, this);
 
+    SDL_Event event;
     int quit = 1;
     while(quit) {
 
@@ -343,11 +344,11 @@ void Game::run()
 
         projectiles_mutex_.lock();
         asteroids_mutex_.lock();
-        while( SDL_PollEvent( &e_ ) != 0 ) {
-            if( e_.type == SDL_QUIT ){
+        while( SDL_PollEvent( &event ) != 0 ) {
+            if( event.type == SDL_QUIT ){
                 quit = 0;
-            } else if (e_.type == SDL_KEYDOWN) {
-                switch(e_.key.keysym.sym){
+            } else if (event.type == SDL_KEYDOWN) {
+                switch(event.key.keysym.sym){
                     case SDL_QUIT:
                         quit = 0;
                         break;
@@ -371,8 +372,8 @@ void Game::run()
                     default:
                         break;
                 }
-            } else if (e_.type == SDL_KEYUP) {
-                switch(e_.key.keysym.sym){
+            } else if (event.type == SDL_KEYUP) {
+                switch(event.key.keysym.sym){
                     case SDLK_UP:
                         up_pushed_ = false;
                         up_unpushed_ = true;

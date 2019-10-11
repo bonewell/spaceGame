@@ -1,8 +1,6 @@
 #ifndef PRIMITIVE_LINE_HPP_
 #define PRIMITIVE_LINE_HPP_
 
-#include <cmath>
-
 #include "point.hpp"
 
 namespace primitive {
