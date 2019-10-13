@@ -12,19 +12,19 @@ add_executable(${PROJECT_NAME}
     "figure/point.cpp"
     "figure/polygon.cpp"
     "figure/rectangle.cpp"
-    "colorschema.cpp"
     "game.cpp"
     "main.cpp"
     "primitive/line.cpp"
     "primitive/point.cpp"
     "scene/sdl_scene.cpp"
-    "skeleton.cpp"
+    "scene/skeleton.cpp"
     "space/asteroid.cpp"
+    "space/colorschema.cpp"
     "space/explosion.cpp"
     "space/nozzle.cpp"
     "space/projectile.cpp"
     "space/ship.cpp"
-    "speed.cpp"
+    "space/speed.cpp"
 )
 target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_17)
 target_link_libraries(${PROJECT_NAME}

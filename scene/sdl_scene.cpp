@@ -2,7 +2,6 @@
 
 #include <cmath>
 
-#include "colorschema.hpp"
 #include "figure/factory_shape.hpp"
 #include "primitive/color.hpp"
 #include "primitive/point.hpp"
@@ -72,9 +71,7 @@ void SdlScene::draw(space::Ship const& ship)
     const auto& border = ship.get_border();
     factory.color(ship.colors.get_color()).polygon(border).draw();
 
-    Skeleton skeleton{renderer_, ColorGenerator{{220,220,220}, {192,192,192},
-                                                {105,105,105}, {211,211,211},
-                                                {119,136,153}}};
+    Skeleton skeleton{renderer_, ship.cologen};
     skeleton.update(ship.getTiltAngel(), size_.width, border[0],
                    primitive::Point{border[1].x/2 + border[2].x/2,
                                     border[1].y/2 + border[2].y/2},
@@ -89,9 +86,7 @@ void SdlScene::draw(space::Nozzle const& nozzle)
     const auto& border = nozzle.get_border();
     factory.color(nozzle.colors.get_color()).polygon(border).draw();
 
-    Skeleton skeleton{renderer_, ColorGenerator{{220,220,220}, {192,192,192},
-                                                {105,105,105}, {211,211,211},
-                                                {119,136,153}}};
+    Skeleton skeleton{renderer_, nozzle.cologen};
     skeleton.update(nozzle.getTiltAngel(), size_.width, border[0],
                     primitive::Point{border[1].x/2 + border[2].x/2,
                                      border[1].y/2 + border[2].y/2},

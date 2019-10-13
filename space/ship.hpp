@@ -28,6 +28,8 @@ public:
   static constexpr int kMaxSpeed{50};
   static constexpr primitive::Size size{30, 60};
   const ColorSchema colors{{255, 255, 0}, {255,8,0}};
+  const ColorGenerator cologen{{220,220,220}, {192,192,192}, {105,105,105},
+                                   {211,211,211}, {119,136,153}};
 
   explicit Ship(primitive::Point coordinate);
   Border const& get_border() const { return border_; }

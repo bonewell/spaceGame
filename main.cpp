@@ -8,6 +8,7 @@ try {
     constexpr int kHeight = 480;
 
     Application{{kWidth, kHeight}}.run();
+    std::cout << "Game over!\n";
 }
 catch (SdlError const& error) {
     std::cout << error.what() << '\n';

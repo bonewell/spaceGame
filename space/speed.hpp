@@ -3,7 +3,7 @@
 
 #include "primitive/point.hpp"
 
-class Speed{
+class Speed {
 private:
     double max_offset_{};
     double forward_offset_{};

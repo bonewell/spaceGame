@@ -2,14 +2,10 @@
 
 #include <iostream>
 #include <memory>
-#include <thread>
 
 #include <unistd.h>
 
-#include <SDL2/SDL.h>
-
-#include "figure/factory_shape.hpp"
-#include "space/grid.hpp"
+//#include "space/grid.hpp"
 
 constexpr auto kAsteroidsRemovingDelay = 10ms;
 constexpr auto kChangePositionDelay = 30ms;
@@ -37,20 +33,27 @@ Game::Game(scene::Scene& scene, primitive::Size size, int life_amount)
   update_asteroids_delay_ = primitive::delay(kAsteroidsRemovingDelay);
 }
 
-void Game::createAsteroid(){
-    double theta = (rand() % 360)/M_PI;
-    auto ship_center = ship_.CalcMedianIntersaction();
-    double tmp_x = (rand() % screen_size_.width) + screen_size_.width;
-    double tmp_y = ship_center.y;
-    primitive::Point p{tmp_x, tmp_y};
-    asteroids_.push_back(std::make_unique<space::Asteroid>(p.rotate(ship_center, theta)));
+void Game::createAsteroid()
+{
+    std::lock_guard lock{asteroids_mutex_};
+    if (asteroids_.size() <= 20){
+        double theta = (rand() % 360)/M_PI;
+        auto ship_center = ship_.CalcMedianIntersaction();
+        double tmp_x = (rand() % screen_size_.width) + screen_size_.width;
+        double tmp_y = ship_center.y;
+        primitive::Point p{tmp_x, tmp_y};
+        asteroids_.push_back(std::make_unique<space::Asteroid>(p.rotate(ship_center, theta)));
+    }
 }
 
-void Game::updateAsteroids(){
+void Game::updateAsteroids()
+{
     if (update_asteroids_delay_ >= primitive::now()){ return; }
     auto tmp_p = ship_.CalcMedianIntersaction();
 
     double diagonal = sqrt(pow(screen_size_.width, 2) + pow(screen_size_.height, 2));
+
+    std::lock_guard lock{asteroids_mutex_};
     for (auto it = std::begin(asteroids_); it != std::end(asteroids_); ++it) {
         auto const& ap = (*it)->get_points().front();
         double distance = sqrt(pow(tmp_p.x - ap.x, 2) + pow(tmp_p.y - ap.y, 2));
@@ -61,7 +64,9 @@ void Game::updateAsteroids(){
     update_asteroids_delay_ = primitive::delay(kAsteroidsRemovingDelay);
 }
 
-void Game::updateProjectiles(){
+void Game::updateProjectiles()
+{
+    std::lock_guard lock{projectiles_mutex_};
     for (auto it = std::begin(projectiles_); it != std::end(projectiles_); ++it) {
         (*it)->update();
         if ((*it)->get_life_time() < primitive::now()) {
@@ -70,6 +75,7 @@ void Game::updateProjectiles(){
     }
 }
 
+namespace {
 bool dot_on_line(primitive::Point *p1, primitive::Point *p2, primitive::Point *px)
 {
     double k = (p2->y - p1->y) / (p2->x - p1->x);
@@ -115,19 +121,20 @@ bool intersect(primitive::Line l1, primitive::Line l2)
             && intersect_1(l1.begin.x, l1.end.x, l2.begin.x, l2.end.x)
             && intersect_1(l1.begin.y, l1.end.y, l2.begin.y, l2.end.y);
 }
+}  // namespace
 
 void Game::checkShipHits()
 {
     while (running_) {
-        asteroids_mutex_.lock();
         shipHitsLoop();
-        asteroids_mutex_.unlock();
+        cleanAsteroids();
         usleep(100);
     }
 }
 
 void Game::shipHitsLoop()
 {
+    std::lock_guard lock{asteroids_mutex_};
     bool hitStatus = false;
 
     for (auto ast = asteroids_.begin(); ast != asteroids_.end(); ++ast){
@@ -155,15 +162,8 @@ void Game::shipHitsLoop()
                         sp2 = *(spacePointsIter + 1);
                     }
                     hitStatus = intersect({p1, p2}, {sp1, sp2});
-                    if (hitStatus){
+                    if (hitStatus) {
                         life_amount_--;
-                        if (!life_amount_){
-                            try{
-                                throw GameOverException();
-                            }catch (...){
-                                globalExceptionPtr = std::current_exception();
-                            }
-                        }
                         (*ast)->markAsDead();
                         break;
                     }
@@ -171,23 +171,21 @@ void Game::shipHitsLoop()
             }
         }
     }
-    cleanAsteroids();
 }
 
 void Game::checkHits()
 {
     while (running_) {
-        projectiles_mutex_.lock();
-        asteroids_mutex_.lock();
         histLoop();
-        asteroids_mutex_.unlock();
-        projectiles_mutex_.unlock();
+        cleanAsteroids();
+        cleanProjectiles();
         usleep(100);
     }
 }
 
 void Game::histLoop()
 {
+    std::scoped_lock lock{projectiles_mutex_, asteroids_mutex_};
     for (auto& ball: projectiles_) {
         if (!ball->isAlive()) { continue; }
         for (auto& ast: asteroids_) {
@@ -213,10 +211,64 @@ void Game::histLoop()
             }
         }
     }
-    cleanLoop();
 }
 
-void Game::generateExplosion(space::Asteroid *tmp_ast)
+void Game::createProjectile()
+{
+    auto ball = ship_.shoot();
+    if (ball) {
+        std::lock_guard lock{projectiles_mutex_};
+        projectiles_.push_back(std::move(ball));
+    }
+}
+
+void Game::displayProjectiles()
+{
+    std::lock_guard lock{projectiles_mutex_};
+    for (auto& ball: projectiles_) {
+        if (ball->isAlive()) {
+            ball->display(scene_);
+        }
+    }
+}
+
+void Game::moveProjectiles(primitive::Direction d)
+{
+    std::lock_guard lock{projectiles_mutex_};
+    for (auto& ball: projectiles_) {
+        ball->move(d);
+    }
+}
+
+void Game::displayAsteroids()
+{
+    std::lock_guard lock{asteroids_mutex_};
+    for (auto& asteroid: asteroids_) {
+        if (asteroid->isAlive()) {
+            asteroid->display(scene_);
+        }
+    }
+}
+
+void Game::moveAsteroids(primitive::Direction d)
+{
+    std::lock_guard lock{asteroids_mutex_};
+    for (auto& asteroid: asteroids_) {
+        asteroid->move(d);
+    }
+}
+
+void Game::displayExplosions()
+{
+    std::lock_guard lock{explosions_mutex_};
+    for (auto& explosion: explosions_) {
+        if (explosion->isAlive()) {
+            explosion->display(scene_);
+        }
+    }
+}
+
+void Game::createExplosion(space::Asteroid *tmp_ast)
 {
     double middle_x = 0.0, middle_y = 0.0;
 
@@ -227,15 +279,17 @@ void Game::generateExplosion(space::Asteroid *tmp_ast)
     }
     middle_x /= tmpPoints.size();
     middle_y /= tmpPoints.size();
+    std::lock_guard lock{explosions_mutex_};
     explosions_.push_back(std::make_unique<space::Explosion>(
         primitive::Point{middle_x, middle_y}, *tmp_ast));
 }
 
 void Game::cleanAsteroids()
 {
+    std::lock_guard lock{asteroids_mutex_};
     for (auto it = std::begin(asteroids_); it != std::end(asteroids_); ++it) {
         if (!(*it)->isAlive()){
-            generateExplosion(it->get());
+            createExplosion(it->get());
             it = asteroids_.erase(it);
         }
     }
@@ -243,6 +297,7 @@ void Game::cleanAsteroids()
 
 void Game::cleanProjectiles()
 {
+    std::lock_guard lock{projectiles_mutex_};
     for (auto it = std::begin(projectiles_); it != std::end(projectiles_); ++it) {
         if (!(*it)->isAlive()){
             it = projectiles_.erase(it);
@@ -252,6 +307,7 @@ void Game::cleanProjectiles()
 
 void Game::cleanExplosions()
 {
+    std::lock_guard lock{explosions_mutex_};
     for (auto it = std::begin(explosions_); it != std::end(explosions_); ++it) {
         if (!(*it)->isAlive()) {
             it = explosions_.erase(it);
@@ -259,35 +315,14 @@ void Game::cleanExplosions()
     }
 }
 
-void Game::cleanLoop(){
-    cleanAsteroids();
-    cleanProjectiles();
-}
-
-void Game::displayObjects()
+void Game::display()
 {
     background_.display(scene_);
     ship_.display(scene_);
-    for (auto& ball: projectiles_) {
-        if (ball->isAlive()) {
-            ball->display(scene_);
-        }
-    }
-
-    for (auto& asteroid: asteroids_) {
-        if (asteroid->isAlive()) {
-            asteroid->display(scene_);
-        }
-    }
-
-    for (auto& explosion: explosions_) {
-        if (explosion->isAlive()) {
-            explosion->display(scene_);
-        }
-    }
-
+    displayProjectiles();
+    displayAsteroids();
+    displayExplosions();
     life_amount_.display(scene_);
-
     scene_.update();
 }
 
@@ -298,147 +333,70 @@ void Game::changeObjectsPositions(){
     auto offset = ship_.getOffset();
     ship_.update();
 
-    for (auto& asteroid: asteroids_) {
-        asteroid->move(offset);
-    }
-
-    for (auto& ball: projectiles_) {
-        ball->move(offset);
-    }
-
-    for (auto explosion = explosions_.begin(); explosion != explosions_.end(); ++explosion){
-        if ( (*explosion)->isAlive() ){
-            (*explosion)->move(offset);
-        }
-        (*explosion)->update();
-    }
+    moveAsteroids(offset);
+    moveProjectiles(offset);
+    moveExplosions(offset);
 
     change_position_delay_ = primitive::delay(kChangePositionDelay);
 }
 
-void Game::run()
-{
+void Game::start() {
     running_ = true;
+    hits_monitoring_ = std::thread{&Game::checkHits, this};
+    ship_hits_monitoring_ = std::thread{&Game::checkShipHits, this};
+}
 
-    displayObjects();
-
-    std::thread hits_monitoring(&Game::checkHits, this);
-    std::thread ship_hits_monitoring(&Game::checkShipHits, this);
-
-    SDL_Event event;
-    int quit = 1;
-    while(quit) {
-
-        if (globalExceptionPtr)
-          {
-            try
-            {
-              std::rethrow_exception(globalExceptionPtr);
-            }
-            catch (const std::exception &ex)
-            {
-              std::cout << "Game Over!" << std::endl;
-              quit = false;
-            }
-          }
-
-        projectiles_mutex_.lock();
-        asteroids_mutex_.lock();
-        while( SDL_PollEvent( &event ) != 0 ) {
-            if( event.type == SDL_QUIT ){
-                quit = 0;
-            } else if (event.type == SDL_KEYDOWN) {
-                switch(event.key.keysym.sym){
-                    case SDL_QUIT:
-                        quit = 0;
-                        break;
-                    case SDLK_UP:
-                        up_pushed_ = true;
-                        up_unpushed_ = false;
-                        break;
-                    case SDLK_DOWN:
-                        down_pushed_ = true;
-                        down_unpushed_ = false;
-                        break;
-                    case SDLK_LEFT:
-                        left_pushed_ = true;
-                        break;
-                    case SDLK_RIGHT:
-                        right_pushed_ = true;
-                        break;
-                    case SDLK_SPACE:
-                        space_pushed_ = true;
-                        break;
-                    default:
-                        break;
-                }
-            } else if (event.type == SDL_KEYUP) {
-                switch(event.key.keysym.sym){
-                    case SDLK_UP:
-                        up_pushed_ = false;
-                        up_unpushed_ = true;
-                        break;
-                    case SDLK_DOWN:
-                        down_pushed_ = false;
-                        down_unpushed_ = true;
-                        break;
-                    case SDLK_LEFT:
-                        left_pushed_ = false;
-                        break;
-                    case SDLK_RIGHT:
-                        right_pushed_ = false;
-                        break;
-                    case SDLK_SPACE:
-                        space_pushed_ = false;
-                        break;
-                    default:
-                        break;
-                }
-            }
-        }
-
-        if (up_pushed_) {
-          ship_.backwardAccelarate();
-          ship_.slowdown();
-        }
-        else if (up_unpushed_) {
-          ship_.backwardSlowdown();
-        }
-        if (down_pushed_) {
-          ship_.accelarate();
-          ship_.backwardSlowdown();
-        }
-        else if (down_unpushed_) {
-          ship_.slowdown();
-        }
-
-        if (left_pushed_) {
-          ship_.rotate(false);
-        }
-        if (right_pushed_) {
-          ship_.rotate(true);
-        }
-
-        if (space_pushed_) {
-            auto ball = ship_.shoot();
-            if (ball) {
-                projectiles_.push_back(std::move(ball));
-            }
-        }
-        changeObjectsPositions();
-        updateAsteroids();
-        updateProjectiles();
-        if (asteroids_.size() <= 20){
-            createAsteroid();
-        }
-
-        cleanExplosions();
-        projectiles_mutex_.unlock();
-        asteroids_mutex_.unlock();
-
-        displayObjects();
-    }
+void Game::stop() {
     running_ = false;
-    hits_monitoring.join();
-    ship_hits_monitoring.join();
+    hits_monitoring_.join();
+    ship_hits_monitoring_.join();
+}
+
+void Game::moveExplosions(primitive::Direction d)
+{
+    std::lock_guard lock{explosions_mutex_};
+    for (auto explosion = explosions_.begin(); explosion != explosions_.end(); ++explosion){
+        if ( (*explosion)->isAlive() ){
+            (*explosion)->move(d);
+        }
+        (*explosion)->update();
+    }
+}
+
+bool Game::update(Action const& action)
+{
+    if (action.up_pushed) {
+      ship_.backwardAccelarate();
+      ship_.slowdown();
+    }
+    else if (action.up_unpushed) {
+      ship_.backwardSlowdown();
+    }
+    if (action.down_pushed) {
+      ship_.accelarate();
+      ship_.backwardSlowdown();
+    }
+    else if (action.down_unpushed) {
+      ship_.slowdown();
+    }
+
+    if (action.left_pushed) {
+      ship_.rotate(false);
+    }
+    if (action.right_pushed) {
+      ship_.rotate(true);
+    }
+
+    if (action.space_pushed) {
+        createProjectile();
+    }
+    changeObjectsPositions();
+    updateAsteroids();
+    updateProjectiles();
+
+    createAsteroid();
+
+    cleanExplosions();
+
+    return life_amount_;
 }

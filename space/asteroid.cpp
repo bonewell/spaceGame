@@ -3,8 +3,6 @@
 #include <algorithm>
 #include <cstdlib>
 
-#include "skeleton.hpp"
-
 namespace space {
 
 Asteroid::Asteroid(primitive::Point coordinate)

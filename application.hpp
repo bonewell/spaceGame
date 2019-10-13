@@ -23,7 +23,6 @@ public:
     Application& operator=(Application const&) = delete;
 
     void run();
-    SDL_Renderer* renderer() const { return renderer_; }
 
 private:
     primitive::Size size_;

@@ -2,10 +2,9 @@
 #define GAME_H
 
 #include <atomic>
-#include <exception>
 #include <list>
 #include <mutex>
-#include <vector>
+#include <thread>
 
 #include "primitive/size.hpp"
 #include "primitive/time.hpp"
@@ -17,33 +16,23 @@
 #include "space/projectile.hpp"
 #include "space/ship.hpp"
 
-struct SDL_Renderer;
-
-static std::exception_ptr globalExceptionPtr = nullptr;
-
-class GameOverException: public std::exception {
-    const char *file_{nullptr};
-    int line_{0};
-    const char* func_{nullptr};
-    const char* info_{nullptr};
-public:
-    GameOverException(const char *msg, const char *file, int line, const char *func, const char *info=""):
-        file_(file),
-        line_(line),
-        func_(func),
-        info_(info)
-    {}
-    GameOverException(){}
-    const char * get_file() {return file_;}
-    int get_line() {return line_;}
-    const char * get_func() {return func_;}
-    const char * get_info() {return info_;}
+struct Action {
+    bool space_pushed{false};
+    bool left_pushed{false};
+    bool right_pushed{false};
+    bool up_pushed{false};
+    bool up_unpushed{false};
+    bool down_pushed{false};
+    bool down_unpushed{false};
 };
 
-class Game{
+class Game {
 public:
     Game(scene::Scene& scene, primitive::Size, int);
-    void run();
+    void start();
+    void stop();
+    void display();
+    bool update(Action const& action);
 
 private:
     scene::Scene& scene_;
@@ -58,6 +47,9 @@ private:
 
     std::mutex asteroids_mutex_;
     std::mutex projectiles_mutex_;
+    std::mutex explosions_mutex_;
+    std::thread hits_monitoring_;
+    std::thread ship_hits_monitoring_;
 
     space::Background background_;
     space::Ship ship_;
@@ -65,37 +57,33 @@ private:
     std::list<space::AsteroidPtr> asteroids_;
     std::list<space::ExplosionPtr> explosions_;
 
-    // Continuous buttom pushing flags
-    bool space_pushed_{false};
-    bool left_pushed_{false};
-    bool right_pushed_{false};
-    bool up_pushed_{false};
-    bool up_unpushed_{false};
-    bool down_pushed_{false};
-    bool down_unpushed_{false};
-
     int inertia_counter_up_{0};
     int inertia_counter_down_{0};
 
-    void displayObjects();
     void changeObjectsPositions();
 
     void createAsteroid();
+    void moveAsteroids(primitive::Direction d);
     void updateAsteroids();
-    void updateProjectiles();
+    void displayAsteroids();
+    void cleanAsteroids();
 
     void checkHits();
     void histLoop();
-    void cleanAsteroids();
+
+    void createProjectile();
+    void moveProjectiles(primitive::Direction d);
+    void updateProjectiles();
+    void displayProjectiles();
     void cleanProjectiles();
+
+    void createExplosion(space::Asteroid*);
+    void moveExplosions(primitive::Direction d);
+    void displayExplosions();
     void cleanExplosions();
-    void cleanLoop();
 
     void checkShipHits();
     void shipHitsLoop();
-    void update();
-
-    void generateExplosion(space::Asteroid*);
 };
 
 #endif

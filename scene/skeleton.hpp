@@ -4,7 +4,7 @@
 #include <utility>
 
 #include "primitive/point.hpp"
-#include "colorschema.hpp"
+#include "space/colorschema.hpp"  // TODO: remove this dependency
 
 struct SDL_Renderer;
 
