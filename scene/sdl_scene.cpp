@@ -161,28 +161,20 @@ void SdlScene::draw(space::LifeAmount const& lifes)
 
 void SdlScene::draw(space::Asteroid const& asteroid)
 {
-    const auto& points = asteroid.get_points();
-    primitive::Point p1;
-    primitive::Point p2;
-    figure::FactoryShape factory{renderer_};
-    factory.color({0, 0, 255, 255});
-    auto iter = std::begin(points);
-    for (; iter != std::end(points)-1; ++iter) {
-        p1 = *iter;
-        p2 = *(iter+1);
-        factory.line(p1, p2).draw();
+    if (asteroid.kBorder) {
+      figure::FactoryShape factory{renderer_};
+      factory.color({0, 0, 255, 255});
+      factory.polygon(asteroid.get_points()).draw();
     }
-    p1 = *std::begin(points);
-    factory.line(p1, p2).draw();
 
     auto center_point = asteroid.center();
     int blocksize = 3;
 
-    iter = std::begin(asteroid.get_points());
+    auto iter = std::begin(asteroid.get_points());
     auto iter_next = iter + 1;
 
-    p1 = *iter;
-    p2 = *iter_next;
+    auto p1 = *iter;
+    auto p2 = *iter_next;
 
     Skeleton skeleton{renderer_, asteroid.colors};
     while (iter_next != std::end(asteroid.get_points())) {

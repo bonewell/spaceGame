@@ -5,8 +5,6 @@
 #include <vector>
 
 #include "colorschema.hpp"
-
-#include "colorschema.hpp"
 #include "object.hpp"
 #include "primitive/point.hpp"
 #include "primitive/time.hpp"
@@ -16,6 +14,7 @@ namespace space {
 
 class Asteroid : public Object {
 public:
+    static constexpr auto kBorder = false;
     static constexpr auto kDisplayDelay = 10ms;
     const ColorGenerator colors{{160, 177, 188}, {119, 98, 84}, {128, 0, 0},
                                 {81, 81, 81}, {76, 62, 54}, {139, 69, 19}};
